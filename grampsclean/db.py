@@ -91,6 +91,32 @@ class GrampsDb:
         except Exception:
             return None
 
+    def get_event_place_handle(self, person, event_type):
+        """
+        Return the place handle (str) for a person's birth or death event,
+        or None if no event, no place, or event_type not 'birth'/'death'.
+
+        :param person: gramps.gen.lib.Person
+        :param event_type: "birth" or "death"
+        :returns: str or None
+        """
+        try:
+            if event_type == "birth":
+                ref = person.get_birth_ref()
+            elif event_type == "death":
+                ref = person.get_death_ref()
+            else:
+                return None
+            if ref is None:
+                return None
+            event = self.db.get_event_from_handle(ref.ref)
+            if event is None:
+                return None
+            place_handle = event.get_place_handle()
+            return place_handle if place_handle else None
+        except Exception:
+            return None
+
     def get_year(self, person, event_type):
         """
         Return the year (int) for a birth or death event, or None.

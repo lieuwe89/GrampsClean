@@ -30,15 +30,15 @@ Genealogists with large kinship databases can find and fix data quality problems
 
 - ✓ Plugin foundation and GRAMPS integration scaffold — Phase 1
 - ✓ Island detection engine (scan + group display + person navigation) — Phase 2
+- ✓ Missing data finder (configurable fields, living/deceased filter, per-field counts, navigation) — Phase 3
+- ✓ Genealogical impossibilities checker (15 rules, configurable thresholds, grouped results with severity colour-coding, navigation) — Phase 4
 
 ### Active (In Progress)
 
-*(Phase 3 — Missing Data Finder)*
+*(Phase 5 — Name Prefix Corrector)*
 
 ### Planned (Next)
 
-- [ ] Missing data finder
-- [ ] Impossibilities checker
 - [ ] Name prefix corrector
 - [ ] Polish and distribution
 
@@ -89,12 +89,14 @@ GRAMPS is an open-source genealogy application written in Python using GTK3. Plu
 | No NetworkX — use stdlib union-find for island detection | NetworkX not reliably available in GRAMPS environment; pure Python union-find is sufficient and zero-dependency | 2026-04-09 | Active |
 | SQLite thread restriction: main-thread snapshot pattern | GRAMPS SQLite connections are thread-local — all DB reads happen on the main thread into plain Python dicts before passing to worker | 2026-04-10 | Active — MANDATORY for Phases 3–5 |
 | GRAMPS person navigation: set_active() + viewmanager.goto_page("People") | set_active() alone only works if Person view is already active; goto_page switches the main window view first | 2026-04-10 | Active — apply to all future navigation |
+| is_deceased = person.get_death_ref() is not None | EventRef presence check avoids extra DB lookup; no probably_alive() needed for living/deceased filter | 2026-04-11 | Active — Phase 3 pattern, reusable |
+| Field presence snapshot: bool flags on main thread, not raw objects | Keeps worker data minimal; bool flags safer to pass across thread boundary than GRAMPS objects | 2026-04-11 | Active — MANDATORY for Phases 4–5 |
 
 ## Success Metrics
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| All 4 core tools functional | 4/4 | 0/4 | Not started |
+| All 4 core tools functional | 4/4 | 3/4 | In progress |
 | Handles 10k-person database without UI freeze | <5s per scan | — | Not started |
 | Name prefix correction: no accidental data loss | 0 unintended changes | — | Not started |
 
@@ -139,4 +141,4 @@ The checker will flag the following (configurable thresholds where noted):
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-04-10 after Phase 2*
+*Last updated: 2026-04-11 after Phase 4*

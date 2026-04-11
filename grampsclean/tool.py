@@ -20,13 +20,13 @@ from widgets import ResultList
 from db import GrampsDb
 from worker import ScanWorker  # noqa: F401 — imported here for future tab use
 from tab_islands import IslandTab
+from tab_missing import MissingTab
+from tab_impossibilities import ImpossibilitiesTab
 
 
-# Placeholder tabs for tools not yet implemented (Phases 3–5)
+# Placeholder tabs for tools not yet implemented (Phase 5)
 PLACEHOLDER_TABS = [
-    ("Missing Data",    [("Name", 0), ("ID", 1), ("Missing", 2)]),
-    ("Impossibilities", [("Name", 0), ("ID", 1), ("Issue", 2)]),
-    ("Name Prefixes",   [("Name", 0), ("ID", 1), ("Suggestion", 2)]),
+    ("Name Prefixes", [("Name", 0), ("ID", 1), ("Suggestion", 2)]),
 ]
 
 
@@ -76,7 +76,15 @@ class GrampsCleanTool(tool.Tool, ManagedWindow):
         island_tab = IslandTab(self.db_wrap, self.uistate)
         self.notebook.append_page(island_tab, Gtk.Label(label="Island Detection"))
 
-        # Tabs 1–3: placeholders until Phases 3–5
+        # Tab 1: Missing Data Finder (Phase 3)
+        missing_tab = MissingTab(self.db_wrap, self.uistate)
+        self.notebook.append_page(missing_tab, Gtk.Label(label="Missing Data"))
+
+        # Tab 2: Impossibilities Checker (Phase 4)
+        impossibilities_tab = ImpossibilitiesTab(self.db_wrap, self.uistate)
+        self.notebook.append_page(impossibilities_tab, Gtk.Label(label="Impossibilities"))
+
+        # Tab 3: placeholder until Phase 5
         for tab_label, columns in PLACEHOLDER_TABS:
             result_list = ResultList(columns)
             result_list.set_border_width(8)

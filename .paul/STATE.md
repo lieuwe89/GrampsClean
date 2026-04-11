@@ -2,29 +2,29 @@
 
 ## Project Reference
 
-See: .paul/PROJECT.md (updated 2026-04-10)
+See: .paul/PROJECT.md (updated 2026-04-11)
 
 **Core value:** Genealogists with large kinship databases can find and fix data quality problems — missing dates, broken connections, logical impossibilities, and naming errors — without manually inspecting every record.
-**Current focus:** v1.0 MVP — Phase 5: Name Prefix Corrector
+**Current focus:** v1.0 MVP — Phase 6: Polish & Distribution
 
 ## Current Position
 
 Milestone: v1.0 MVP (v1.0)
-Phase: 5 of 6 (Name Prefix Corrector) — In progress
-Plan: 05-03 created, awaiting approval
-Status: PLAN created, ready for APPLY
-Last activity: 2026-04-11 — Created .paul/phases/05-name-prefix-corrector/05-03-PLAN.md
+Phase: 6 of 6 (Polish & Distribution) — Not started
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-04-11 — Phase 5 complete, transitioned to Phase 6
 
 Progress:
-- Milestone: [████████████████░░░░] 67%
-- Phase 5: [██████░░░░] 67%
+- Milestone: [█████████████████░░░] 83%
+- Phase 6: [░░░░░░░░░░] 0%
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ○        ○     [Plan created, awaiting approval]
+  ○        ○        ○     [Ready to plan Phase 6]
 ```
 
 ## Performance Metrics
@@ -42,7 +42,7 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | 02-Island Detection | 3/3 ✓ | - | - |
 | 03-Missing Data Finder | 2/2 ✓ | - | - |
 | 04-Impossibilities Checker | 3/3 ✓ | - | - |
-| 05-Name Prefix Corrector | 0/3 | - | - |
+| 05-Name Prefix Corrector | 3/3 ✓ | - | - |
 | 06-Polish & Distribution | 0/2 | - | - |
 
 ## Accumulated Context
@@ -62,6 +62,9 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | SQLite thread restriction — all DB reads on main thread, worker gets plain Python snapshot | 02-02 | ALL future tab phases (MANDATORY) |
 | Main-thread snapshot pattern: person_handles + person_names + family_edges as dicts before worker.start() | 02-02 | Phases 3–5 |
 | GRAMPS navigation: set_active(handle, 'Person') + viewmanager.goto_page(get_category("People"), None) | 02-03 | All future tabs with row navigation |
+| DEFAULT_PREFIXES sorted longest-first — prevents partial prefix match | 05-01 | Prefix list maintenance |
+| DbTxn import: from gramps.gen.db import DbTxn (NOT gramps.db) | 05-03 | ALL future write operations |
+| Plugin sync required after every edit: cp -r grampsclean/* to GRAMPS plugins folder | 05-03 | Dev workflow — documented in CLAUDE.md |
 
 ### Deferred Issues
 
@@ -76,9 +79,9 @@ PLAN ──▶ APPLY ──▶ UNIFY
 ## Session Continuity
 
 Last session: 2026-04-11
-Stopped at: Plan 05-02 unified — PreviewTable live, detect_issues enriched, loop closed
-Next action: /paul:plan — Plan 05-03 (bulk apply via DbTxn with undo support)
-Resume file: .paul/phases/05-name-prefix-corrector/05-02-SUMMARY.md
+Stopped at: Phase 5 complete — all 3 plans unified, v0.4.0 tagged and pushed
+Next action: /paul:plan — Phase 6 (Polish & Distribution: preferences dialog + CSV export)
+Resume file: .paul/ROADMAP.md
 
 ---
 *STATE.md — Updated after every significant action*

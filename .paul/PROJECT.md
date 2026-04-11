@@ -13,9 +13,9 @@ Genealogists with large kinship databases can find and fix data quality problems
 | Attribute | Value |
 |-----------|-------|
 | Type | Application (GRAMPS Plugin) |
-| Version | 0.0.1 |
-| Status | Prototype |
-| Last Updated | 2026-04-08 |
+| Version | 0.4.0 |
+| Status | In Development |
+| Last Updated | 2026-04-11 |
 
 ## Requirements
 
@@ -32,14 +32,14 @@ Genealogists with large kinship databases can find and fix data quality problems
 - ✓ Island detection engine (scan + group display + person navigation) — Phase 2
 - ✓ Missing data finder (configurable fields, living/deceased filter, per-field counts, navigation) — Phase 3
 - ✓ Genealogical impossibilities checker (15 rules, configurable thresholds, grouped results with severity colour-coding, navigation) — Phase 4
+- ✓ Name prefix corrector (detect → preview with checkboxes → bulk apply via DbTxn with undo) — Phase 5
 
 ### Active (In Progress)
 
-*(Phase 5 — Name Prefix Corrector)*
+*(Phase 6 — Polish & Distribution)*
 
 ### Planned (Next)
 
-- [ ] Name prefix corrector
 - [ ] Polish and distribution
 
 ### Out of Scope
@@ -91,12 +91,15 @@ GRAMPS is an open-source genealogy application written in Python using GTK3. Plu
 | GRAMPS person navigation: set_active() + viewmanager.goto_page("People") | set_active() alone only works if Person view is already active; goto_page switches the main window view first | 2026-04-10 | Active — apply to all future navigation |
 | is_deceased = person.get_death_ref() is not None | EventRef presence check avoids extra DB lookup; no probably_alive() needed for living/deceased filter | 2026-04-11 | Active — Phase 3 pattern, reusable |
 | Field presence snapshot: bool flags on main thread, not raw objects | Keeps worker data minimal; bool flags safer to pass across thread boundary than GRAMPS objects | 2026-04-11 | Active — MANDATORY for Phases 4–5 |
+| DEFAULT_PREFIXES sorted longest-first | Prevents "van" matching before "van der" — would produce wrong prefix strip | 2026-04-11 | Active — must maintain if user edits list |
+| DbTxn import: from gramps.gen.db import DbTxn | gramps.db does not exist; all GRAMPS write plugins use gramps.gen.db | 2026-04-11 | Active — apply to all future write operations |
+| Plugin sync required after every file edit | GRAMPS loads from ~/Library/Application Support/gramps/gramps60/plugins/ — source edits must be cp -r to that folder | 2026-04-11 | Active — documented in CLAUDE.md |
 
 ## Success Metrics
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| All 4 core tools functional | 4/4 | 3/4 | In progress |
+| All 4 core tools functional | 4/4 | 4/4 | ✓ Complete |
 | Handles 10k-person database without UI freeze | <5s per scan | — | Not started |
 | Name prefix correction: no accidental data loss | 0 unintended changes | — | Not started |
 
@@ -141,4 +144,4 @@ The checker will flag the following (configurable thresholds where noted):
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-04-11 after Phase 4*
+*Last updated: 2026-04-11 after Phase 5*

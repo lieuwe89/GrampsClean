@@ -16,18 +16,12 @@ from gi.repository import Gtk
 from gramps.gui.plug import tool, MenuToolOptions
 from gramps.gui.managedwindow import ManagedWindow
 
-from widgets import ResultList
 from db import GrampsDb
 from worker import ScanWorker  # noqa: F401 — imported here for future tab use
 from tab_islands import IslandTab
 from tab_missing import MissingTab
 from tab_impossibilities import ImpossibilitiesTab
-
-
-# Placeholder tabs for tools not yet implemented (Phase 5)
-PLACEHOLDER_TABS = [
-    ("Name Prefixes", [("Name", 0), ("ID", 1), ("Suggestion", 2)]),
-]
+from tab_prefixes import PrefixesTab
 
 
 class GrampsCleanOptions(MenuToolOptions):
@@ -84,11 +78,9 @@ class GrampsCleanTool(tool.Tool, ManagedWindow):
         impossibilities_tab = ImpossibilitiesTab(self.db_wrap, self.uistate)
         self.notebook.append_page(impossibilities_tab, Gtk.Label(label="Impossibilities"))
 
-        # Tab 3: placeholder until Phase 5
-        for tab_label, columns in PLACEHOLDER_TABS:
-            result_list = ResultList(columns)
-            result_list.set_border_width(8)
-            self.notebook.append_page(result_list, Gtk.Label(label=tab_label))
+        # Tab 3: Name Prefix Corrector (Phase 5)
+        prefixes_tab = PrefixesTab(self.db_wrap, self.uistate)
+        self.notebook.append_page(prefixes_tab, Gtk.Label(label="Name Prefixes"))
 
         root_box.pack_start(self.notebook, True, True, 0)
 

@@ -12,16 +12,8 @@ from gi.repository import Gtk, GLib
 
 from gramps.gen.lib import EventType
 
+import prefs
 from worker import ScanWorker
-
-# Default thresholds — Phase 04-02 adds configuration UI to override these
-DEFAULT_THRESHOLDS = {
-    "father_postdeath_years": 1,  # flag if child born >1yr after father's death
-    "mother_min_age": 12,         # min mother age at child's birth (Warning)
-    "father_min_age": 13,         # min father age at child's birth (Warning)
-    "mother_max_age": 60,         # max mother age at child's birth (Warning)
-    "father_max_age": 90,         # max father age at child's birth (Warning)
-}
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +30,7 @@ def _date_tuple(date_obj):
     if date_obj is None:
         return None
     try:
-        if not date_obj.is_regular():
+        if date_obj.is_compound():
             return None
         year = date_obj.get_year()
         if not year:
@@ -536,6 +528,44 @@ class GroupedResultView(Gtk.Box):
     def set_status(self, text):
         self.status_label.set_text(text)
 
+    def export_csv(self, parent_window=None):
+        """Export all findings to a user-chosen CSV file (flattened, child rows only)."""
+        import csv
+        dialog = Gtk.FileChooserDialog(
+            title="Export CSV",
+            parent=parent_window,
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Save",   Gtk.ResponseType.OK)
+        dialog.set_do_overwrite_confirmation(True)
+        dialog.set_current_name("grampsclean_export.csv")
+        response = dialog.run()
+        path = dialog.get_filename()
+        dialog.destroy()
+        if response != Gtk.ResponseType.OK or not path:
+            return
+        n_rows = 0
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Rule", "Name", "ID", "Severity", "Detail"])
+            root_iter = self.store.get_iter_first()
+            while root_iter is not None:
+                rule_name = self.store.get_value(root_iter, self._COL_DISPLAY)
+                child_iter = self.store.iter_children(root_iter)
+                while child_iter is not None:
+                    writer.writerow([
+                        rule_name,
+                        self.store.get_value(child_iter, self._COL_DISPLAY),
+                        self.store.get_value(child_iter, self._COL_ID),
+                        self.store.get_value(child_iter, self._COL_SEVERITY),
+                        self.store.get_value(child_iter, self._COL_DETAIL),
+                    ])
+                    n_rows += 1
+                    child_iter = self.store.iter_next(child_iter)
+                root_iter = self.store.iter_next(root_iter)
+        self.set_status(f"Exported {n_rows} rows to {path}")
+
     def append_row(self, name, gramps_id, rule_name, severity, detail="", handle=""):
         """Add a finding under its rule-name parent group.
 
@@ -605,7 +635,7 @@ class ImpossibilitiesTab(Gtk.Box):
         self._uistate = uistate
         self._snapshot = None
         self._worker = None
-        self._active_thresholds = dict(DEFAULT_THRESHOLDS)
+        self._active_thresholds = prefs.get_thresholds()
 
         self._build_toolbar()
         self.pack_start(self._build_config_panel(), False, False, 0)
@@ -629,6 +659,10 @@ class ImpossibilitiesTab(Gtk.Box):
         self._cancel_btn.connect("clicked", self._on_cancel)
         toolbar.pack_start(self._cancel_btn, False, False, 0)
 
+        export_btn = Gtk.Button(label="Export CSV")
+        export_btn.connect("clicked", self._on_export_csv)
+        toolbar.pack_start(export_btn, False, False, 0)
+
         self.pack_start(toolbar, False, False, 0)
 
     def _build_config_panel(self):
@@ -648,13 +682,14 @@ class ImpossibilitiesTab(Gtk.Box):
             ("Father maximum age at birth:",             "father_max_age",        50, 120),
         ]
 
+        thresholds = prefs.get_thresholds()
         self._threshold_spins = {}
         for row_idx, (label_text, key, lo, hi) in enumerate(rows):
             label = Gtk.Label(label=label_text)
             label.set_halign(Gtk.Align.END)
 
             adj = Gtk.Adjustment(
-                value=DEFAULT_THRESHOLDS[key],
+                value=thresholds[key],
                 lower=lo, upper=hi,
                 step_increment=1, page_increment=5, page_size=0,
             )
@@ -701,6 +736,9 @@ class ImpossibilitiesTab(Gtk.Box):
         if self._worker:
             self._worker.cancel()
         self._cancel_btn.set_sensitive(False)
+
+    def _on_export_csv(self, btn):
+        self._result_list.export_csv(parent_window=self.get_toplevel())
 
     def _check_done(self):
         if self._worker is not None and self._worker.is_running():

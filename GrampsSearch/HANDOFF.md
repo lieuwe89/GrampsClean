@@ -150,8 +150,8 @@ for every person on the second open).
 
 Remaining follow-ups:
 - Live-verified inside GRAMPS (two consecutive window opens — DONE).
-- Add "Clear cache" button to `ui.SearchBox` toolbar (wraps
-  `api.cache.clear_cache`).
+- "Clear API cache" button in `ui.SearchBox` button row — DONE
+  (wraps `api.cache.clear_cache`, updates status text).
 - Expose TTL + cache-enabled toggle via future `prefs.py`.
 
 ### 2. Widen year window — SHIPPED

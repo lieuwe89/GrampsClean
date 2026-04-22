@@ -18,6 +18,7 @@ from gi.repository import Gtk, GLib
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
 from matcher import score_candidate
+from api.cache import clear_cache
 
 _ = glocale.translation.gettext
 
@@ -155,6 +156,12 @@ class SearchBox(Gtk.Box):
         btns.set_margin_start(8)
         btns.set_margin_end(8)
         btns.set_margin_bottom(8)
+        self.clear_cache_btn = Gtk.Button(label=_("Clear API cache"))
+        self.clear_cache_btn.set_tooltip_text(
+            _("Delete the on-disk response cache. Next scan will re-fetch.")
+        )
+        self.clear_cache_btn.connect("clicked", self._on_clear_cache)
+        btns.pack_start(self.clear_cache_btn, False, False, 0)
         self.merge_btn = Gtk.Button(label=_("Merge selected candidate"))
         self.merge_btn.connect("clicked", self._on_merge)
         self.merge_btn.set_sensitive(False)
@@ -305,6 +312,12 @@ class SearchBox(Gtk.Box):
         self._cancel.set()
         self.cancel_btn.set_sensitive(False)
         self.cancel_btn.set_label(_("Cancelling…"))
+
+    def _on_clear_cache(self, *_args):
+        clear_cache()
+        self.status.set_text(
+            _("API cache cleared — next scan will re-fetch from the archives.")
+        )
 
     # ------------------------------------------------------------------
     # Selection + merge

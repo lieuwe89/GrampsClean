@@ -62,6 +62,8 @@ class SearchBox(Gtk.Box):
         self._people_with_matches = 0
         self._current_candidate = None
         self._current_person = None
+        self._current_local = None
+        self._field_checks = {}
 
         self._build_ui()
         self._start_scan()
@@ -122,18 +124,22 @@ class SearchBox(Gtk.Box):
         self.pack_start(sw, True, True, 0)
         self.tree = tree
 
-        # Detail view
-        self.detail_view = Gtk.TextView(editable=False)
-        self.detail_view.set_wrap_mode(Gtk.WrapMode.WORD)
+        # Detail / per-field merge grid
+        self.detail_grid = Gtk.Grid(column_spacing=12, row_spacing=4)
+        self.detail_grid.set_margin_start(8)
+        self.detail_grid.set_margin_end(8)
+        self.detail_grid.set_margin_top(4)
+        self.detail_grid.set_margin_bottom(4)
         det_sw = Gtk.ScrolledWindow()
         det_sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        det_sw.set_min_content_height(120)
-        det_sw.add(self.detail_view)
-        det_frame = Gtk.Frame(label=_("Selection detail"))
+        det_sw.set_min_content_height(140)
+        det_sw.add(self.detail_grid)
+        det_frame = Gtk.Frame(label=_("Field-level merge — tick fields to apply"))
         det_frame.add(det_sw)
         det_frame.set_margin_start(8)
         det_frame.set_margin_end(8)
         self.pack_start(det_frame, False, True, 0)
+        self._rebuild_detail(None, None)
 
         # Status + buttons
         self.status = Gtk.Label(xalign=0)
@@ -299,60 +305,130 @@ class SearchBox(Gtk.Box):
         if not it:
             self._current_candidate = None
             self._current_person = None
+            self._current_local = None
             self.merge_btn.set_sensitive(False)
-            self._set_text(self.detail_view, "")
+            self._rebuild_detail(None, None)
             return
 
         cand = model.get_value(it, 7)
         if cand is None:
-            # Parent (person) row — no candidate selected
             self._current_candidate = None
             self._current_person = None
+            self._current_local = None
             self.merge_btn.set_sensitive(False)
-            self._set_text(self.detail_view, _("Select a candidate row to merge."))
+            self._rebuild_detail(None, None)
             return
 
-        # Walk up to parent for the person object
         parent_it = model.iter_parent(it)
         person = model.get_value(parent_it, 6) if parent_it else None
         if person is None:
             self.merge_btn.set_sensitive(False)
             return
 
+        try:
+            local = self.db.person_summary(person)
+        except Exception as e:
+            local = {}
+            print(f"[GrampsSearch] person_summary on selection failed: {e}")
+
         self._current_candidate = cand
         self._current_person = person
+        self._current_local = local
         self.merge_btn.set_sensitive(True)
-        self._set_text(self.detail_view, self._fmt_candidate(cand))
+        self._rebuild_detail(local, cand)
 
-    def _fmt_candidate(self, c):
-        return (
-            f"{c.surname}, {c.given}   [{c.source}]\n\n"
-            f"{_('Birth')}: {c.birth_date or '—'}  @ {c.birth_place}\n"
-            f"{_('Death')}: {c.death_date or '—'}  @ {c.death_place}\n\n"
-            f"{c.detail_url}"
+    def _rebuild_detail(self, local, cand):
+        for child in self.detail_grid.get_children():
+            self.detail_grid.remove(child)
+        self._field_checks = {}
+
+        if cand is None:
+            msg = Gtk.Label(
+                label=_("Select a candidate row to merge."), xalign=0
+            )
+            self.detail_grid.attach(msg, 0, 0, 4, 1)
+            self.detail_grid.show_all()
+            return
+
+        title = Gtk.Label(xalign=0)
+        title.set_markup(
+            f"<b>{cand.surname}, {cand.given}</b>   [{cand.source}]"
         )
+        self.detail_grid.attach(title, 0, 0, 4, 1)
+
+        for col, txt in enumerate(("", _("Field"), _("Local"), _("Candidate"))):
+            l = Gtk.Label(xalign=0)
+            l.set_markup(f"<b>{txt}</b>")
+            self.detail_grid.attach(l, col, 1, 1, 1)
+
+        local = local or {}
+        local_birth = local.get("birth") or {}
+        local_death = local.get("death") or {}
+        rows = [
+            ("birth_date",  _("Birth date"),  local_birth.get("date_text", ""), cand.birth_date  or ""),
+            ("birth_place", _("Birth place"), local_birth.get("place", ""),     cand.birth_place or ""),
+            ("death_date",  _("Death date"),  local_death.get("date_text", ""), cand.death_date  or ""),
+            ("death_place", _("Death place"), local_death.get("place", ""),     cand.death_place or ""),
+        ]
+        for r, (key, label, lv, cv) in enumerate(rows, start=2):
+            chk = Gtk.CheckButton()
+            has_cand = bool(cv)
+            chk.set_sensitive(has_cand)
+            # Default: tick when candidate has data and local is empty.
+            chk.set_active(has_cand and not lv)
+            self._field_checks[key] = chk
+            self.detail_grid.attach(chk, 0, r, 1, 1)
+
+            self.detail_grid.attach(Gtk.Label(label=label, xalign=0), 1, r, 1, 1)
+
+            ll = Gtk.Label(label=lv or "—", xalign=0)
+            ll.set_selectable(True)
+            self.detail_grid.attach(ll, 2, r, 1, 1)
+
+            cl = Gtk.Label(label=cv or "—", xalign=0)
+            cl.set_selectable(True)
+            self.detail_grid.attach(cl, 3, r, 1, 1)
+
+        if cand.detail_url:
+            src = Gtk.Label(xalign=0)
+            src.set_markup(f"<i>{_('Source')}:</i> {cand.detail_url}")
+            src.set_selectable(True)
+            src.set_line_wrap(True)
+            self.detail_grid.attach(src, 0, len(rows) + 2, 4, 1)
+
+        self.detail_grid.show_all()
 
     def _on_merge(self, *_args):
         if not self._current_candidate or not self._current_person:
             return
         c = self._current_candidate
+        chk = self._field_checks
+
+        def picked(key, value):
+            box = chk.get(key)
+            return value if (box is not None and box.get_active() and value) else None
+
+        birth_date  = picked("birth_date",  c.birth_date)
+        birth_place = picked("birth_place", c.birth_place)
+        death_date  = picked("death_date",  c.death_date)
+        death_place = picked("death_place", c.death_place)
+
         selected = {
-            "birth": {"date_text": c.birth_date, "place": c.birth_place}
-            if (c.birth_date or c.birth_place) else None,
-            "death": {"date_text": c.death_date, "place": c.death_place}
-            if (c.death_date or c.death_place) else None,
+            "birth": {"date_text": birth_date, "place": birth_place}
+                if (birth_date or birth_place) else None,
+            "death": {"date_text": death_date, "place": death_place}
+                if (death_date or death_place) else None,
             "source_url": c.detail_url,
         }
+        if not selected["birth"] and not selected["death"]:
+            self.status.set_text(_("Nothing ticked to merge."))
+            return
         try:
             self.db.merge_fields(
                 self._current_person,
                 selected,
                 source_title=f"GrampsSearch: {c.source}",
             )
-            self.status.set_text(_("Merged candidate from %s.") % c.source)
+            self.status.set_text(_("Merged ticked fields from %s.") % c.source)
         except Exception as e:
             self.status.set_text(_("Merge failed: %s") % e)
-
-    @staticmethod
-    def _set_text(view, text):
-        view.get_buffer().set_text(text or "")

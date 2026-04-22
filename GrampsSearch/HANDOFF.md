@@ -6,6 +6,15 @@ user approve + merge into the local database.
 
 ## Status
 
+- **API response cache (NEW)**: `api/cache.py` ships a `CachedConnector`
+  wrapper. `tool._build_connectors` wraps every connector. SQLite file
+  at `~/Library/Application Support/gramps/gramps60/grampssearch_cache.db`.
+  Key = `source|given_norm|surname_norm|year`. Value = JSON list of
+  `ExternalPerson.as_dict()`. TTL = 30 days. One fresh sqlite connection
+  per call (scan bottleneck is HTTP). `[cache] HIT`/`MISS` lines land
+  in `~/Documents/grampssearch-debug.log`. Offline round-trip smoke
+  test passed (1 miss + N hits, normalization + raw-dict preservation).
+  Not yet live-tested inside GRAMPS.
 - Scaffold complete, loads in GRAMPS 6.0, window opens.
 - Live-validated: AlleGroningers + Open Archieven normalizers map
   real responses into the `ExternalPerson` dataclass correctly.
@@ -119,44 +128,34 @@ GrampsSearch/
 
 ## Next steps
 
-### 1. Cache API responses (CHOSEN — next session)
+### 1. Cache API responses — SHIPPED
 
-Goal: cut redundant HTTP across re-scans and across people who
-share a surname.
+Implemented in `api/cache.py` exactly to the design below. Live-test
+inside GRAMPS still pending (open window twice, confirm `[cache] HIT`
+for every person on the second open).
 
-Design notes:
-- Cache key: tuple `(source_name, given_normalized, surname_normalized, year_hint)`.
-  Normalize via `.strip().lower()`. Year may be `None`.
-- Cache value: the raw `list[ExternalPerson]` returned by
-  `connector.search(...)` — stored as JSON via `dataclasses.asdict`.
-- Storage: SQLite file under
-  `~/Library/Application Support/gramps/gramps60/grampssearch_cache.db`
-  (path chosen so users can delete it). Single table:
-  `cache(key TEXT PRIMARY KEY, source TEXT, fetched_at INTEGER, payload TEXT)`.
-- TTL: 30 days default. Configurable later via `prefs.py`.
-- Wrap each connector's `search()` in a `CachedConnector` decorator
-  in `api/cache.py` so connectors stay pure. `tool._build_connectors`
-  wraps each connector after construction.
-- Add a "Clear cache" button to the toolbar in `ui.SearchBox`,
-  or at minimum log cache hits/misses to debug log.
-- Threading: SQLite writes happen on the worker thread inside
-  `cached_search()`. Use `sqlite3.connect(..., check_same_thread=False)`
-  with a `threading.Lock` per connection, OR open a fresh connection
-  per call (simpler, slower).
+- Key: `source|given_norm|surname_norm|year` (normalize via
+  `.strip().lower()`; `year` may be empty).
+- Value: JSON-encoded list of `ExternalPerson.as_dict()` rows.
+  Reconstruct with `ExternalPerson(**d)` on hit.
+- Storage: `~/Library/Application Support/gramps/gramps60/grampssearch_cache.db`,
+  single `cache(key, source, fetched_at, payload)` table. Users can
+  delete the file to reset.
+- TTL: 30 days (`DEFAULT_TTL_SECONDS`). Stale rows ignored + overwritten.
+- `CachedConnector` exposes the wrapped connector's `source_name` so
+  UI introspection (`c.source_name`) keeps working.
+- Threading: fresh `sqlite3.connect` per call (5s timeout). Scan
+  bottleneck is HTTP; avoids shared-connection locking.
+- Logging: `[cache] HIT`/`MISS`/`...` lines written to the same
+  `~/Documents/grampssearch-debug.log` that `ui._log` uses.
+- `clear_cache()` helper exists (removes the file). Not yet wired to
+  a UI button — still a "nice to have".
 
-Files to add/touch:
-- `api/cache.py` (NEW): `CachedConnector` wrapper + sqlite open helper.
-- `tool.py::_build_connectors`: wrap each connector with `CachedConnector`.
-- `ui.py`: add "Clear cache" button (optional first pass — can ship
-  without UI control and just delete the file manually).
-- `HANDOFF.md`: update once shipped.
-
-Acceptance:
-- Open the window twice in a row. Second open's debug log shows
-  `CACHE HIT` for every person the first scan covered, and total
-  scan time should drop dramatically (no HTTP).
-- Inspect SQLite file with `sqlite3` cli: rows for both connectors,
-  `fetched_at` epoch, JSON payload parses.
+Remaining follow-ups:
+- Live-verify inside GRAMPS (two consecutive window opens).
+- Add "Clear cache" button to `ui.SearchBox` toolbar (wraps
+  `api.cache.clear_cache`).
+- Expose TTL + cache-enabled toggle via future `prefs.py`.
 
 ### 2. `prefs.py`
 

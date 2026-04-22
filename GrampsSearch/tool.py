@@ -25,7 +25,12 @@ from gramps.gui.managedwindow import ManagedWindow
 from db import GrampsDb
 from matcher import filter_and_rank
 from ui import SearchBox
-from api import OpenArchievenClient, AlleGroningersClient, GenealogieOnlineClient  # noqa: F401
+from api import (  # noqa: F401
+    OpenArchievenClient,
+    AlleGroningersClient,
+    GenealogieOnlineClient,
+    CachedConnector,
+)
 
 _ = glocale.translation.gettext
 
@@ -54,12 +59,12 @@ class GrampsSearchTool(tool.Tool, ManagedWindow):
     # ------------------------------------------------------------------
 
     def _build_connectors(self):
-        connectors = [
+        raw = [
             OpenArchievenClient(),
             AlleGroningersClient(),
         ]
         # GenealogieOnline needs OAuth2 creds — wire via prefs later.
-        return connectors
+        return [CachedConnector(c) for c in raw]
 
     def _build_window(self):
         window = Gtk.Window()

@@ -85,6 +85,33 @@ class ResultList(Gtk.Box):
         """Update the status bar text."""
         self.status_label.set_text(text)
 
+    def export_csv(self, parent_window=None):
+        """Export current rows to a user-chosen CSV file."""
+        import csv
+        dialog = Gtk.FileChooserDialog(
+            title="Export CSV",
+            parent=parent_window,
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Save",   Gtk.ResponseType.OK)
+        dialog.set_do_overwrite_confirmation(True)
+        dialog.set_current_name("grampsclean_export.csv")
+        response = dialog.run()
+        path = dialog.get_filename()
+        dialog.destroy()
+        if response != Gtk.ResponseType.OK or not path:
+            return
+        headers = [title for title, _ in self._visible_columns]
+        n_vis = len(self._visible_columns)
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            for row in self.store:
+                writer.writerow(list(row)[:n_vis])
+        n_rows = len(self.store)
+        self.set_status(f"Exported {n_rows} rows to {path}")
+
     def append_row(self, *values):
         """
         Append a row.

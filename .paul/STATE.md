@@ -5,26 +5,26 @@
 See: .paul/PROJECT.md (updated 2026-04-11)
 
 **Core value:** Genealogists with large kinship databases can find and fix data quality problems — missing dates, broken connections, logical impossibilities, and naming errors — without manually inspecting every record.
-**Current focus:** v1.0 MVP — Phase 6: Polish & Distribution
+**Current focus:** v1.0 MVP — Complete
 
 ## Current Position
 
-Milestone: v1.0 MVP (v1.0)
-Phase: 6 of 6 (Polish & Distribution) — Not started
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-04-11 — Phase 5 complete, transitioned to Phase 6
+Milestone: v1.0 MVP (v1.0) — COMPLETE
+Phase: 6 of 6 (Polish & Distribution) — Complete
+Plan: 06-02 unified
+Status: Milestone complete — all 6 phases shipped
+Last activity: 2026-04-11 — Phase 6 complete, v1.0 MVP shipped
 
 Progress:
-- Milestone: [█████████████████░░░] 83%
-- Phase 6: [░░░░░░░░░░] 0%
+- Milestone: [████████████████████] 100%
+- Phase 6: [██████████] 100%
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [Ready to plan Phase 6]
+  ✓        ✓        ✓     [Loop complete — milestone complete]
 ```
 
 ## Performance Metrics
@@ -43,7 +43,7 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | 03-Missing Data Finder | 2/2 ✓ | - | - |
 | 04-Impossibilities Checker | 3/3 ✓ | - | - |
 | 05-Name Prefix Corrector | 3/3 ✓ | - | - |
-| 06-Polish & Distribution | 0/2 | - | - |
+| 06-Polish & Distribution | 2/2 ✓ | - | - |
 
 ## Accumulated Context
 
@@ -79,8 +79,8 @@ PLAN ──▶ APPLY ──▶ UNIFY
 ## Session Continuity
 
 Last session: 2026-04-11
-Stopped at: Phase 5 complete — all 3 plans unified, v0.4.0 tagged and pushed
-Next action: /paul:plan — Phase 6 (Polish & Distribution: preferences dialog + CSV export)
+Stopped at: v1.0 MVP complete — all 6 phases shipped
+Next action: Start next milestone or prepare repository for release
 Resume file: .paul/ROADMAP.md
 
 ---

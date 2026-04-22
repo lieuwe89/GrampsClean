@@ -11,19 +11,8 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib
 
 from gramps.gen.db import DbTxn
+import prefs
 from worker import ScanWorker
-
-
-# Sorted longest-first so "van der" is matched before "van" (avoids partial match)
-DEFAULT_PREFIXES = [
-    "van der", "van den", "van de", "van het",
-    "in het", "op de", "in de", "aan de",
-    "von der", "von den",
-    "de la", "de los", "de las",
-    "van", "de", "den", "het", "ten", "ter", "te",
-    "von", "zum", "zur", "zu",
-    "du", "des", "le", "la", "les",
-]
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +186,37 @@ class PreviewTable(Gtk.Box):
     def set_status(self, text):
         self.status_label.set_text(text)
 
+    def export_csv(self, parent_window=None):
+        """Export visible rows (Name, ID, Field, Current, Proposed) to a CSV file."""
+        import csv
+        dialog = Gtk.FileChooserDialog(
+            title="Export CSV",
+            parent=parent_window,
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Save",   Gtk.ResponseType.OK)
+        dialog.set_do_overwrite_confirmation(True)
+        dialog.set_current_name("grampsclean_export.csv")
+        response = dialog.run()
+        path = dialog.get_filename()
+        dialog.destroy()
+        if response != Gtk.ResponseType.OK or not path:
+            return
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Name", "ID", "Field", "Current", "Proposed"])
+            for row in self.store:
+                writer.writerow([
+                    row[self._COL_NAME],
+                    row[self._COL_ID],
+                    row[self._COL_FIELD],
+                    row[self._COL_CURRENT],
+                    row[self._COL_PROPOSED],
+                ])
+        n_rows = len(self.store)
+        self.set_status(f"Exported {n_rows} rows to {path}")
+
     def append_row(self, checked, name, gramps_id, field, current, proposed, handle, prefix, ftype):
         if not name:
             return
@@ -259,7 +279,7 @@ class PrefixesTab(Gtk.Box):
         self._uistate = uistate
         self._snapshot = None
         self._worker = None
-        self._active_prefixes = list(DEFAULT_PREFIXES)
+        self._active_prefixes = prefs.get_prefix_list()
 
         self._build_toolbar()
         self.pack_start(self._build_prefix_panel(), False, False, 0)
@@ -296,6 +316,10 @@ class PrefixesTab(Gtk.Box):
         self._apply_btn.connect("clicked", self._on_apply)
         toolbar.pack_start(self._apply_btn, False, False, 0)
 
+        export_btn = Gtk.Button(label="Export CSV")
+        export_btn.connect("clicked", self._on_export_csv)
+        toolbar.pack_start(export_btn, False, False, 0)
+
         self.pack_start(toolbar, False, False, 0)
 
     def _build_prefix_panel(self):
@@ -316,7 +340,7 @@ class PrefixesTab(Gtk.Box):
 
         self._prefix_view = Gtk.TextView()
         self._prefix_view.set_wrap_mode(Gtk.WrapMode.WORD)
-        self._prefix_view.get_buffer().set_text("\n".join(DEFAULT_PREFIXES))
+        self._prefix_view.get_buffer().set_text("\n".join(prefs.get_prefix_list()))
         scroll.add(self._prefix_view)
 
         inner.pack_start(scroll, True, True, 0)
@@ -363,6 +387,9 @@ class PrefixesTab(Gtk.Box):
         if self._worker:
             self._worker.cancel()
         self._cancel_btn.set_sensitive(False)
+
+    def _on_export_csv(self, btn):
+        self._result_list.export_csv(parent_window=self.get_toplevel())
 
     def _on_apply(self, btn):
         """Write checked corrections to the GRAMPS database inside a single DbTxn."""

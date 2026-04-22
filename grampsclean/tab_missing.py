@@ -62,6 +62,10 @@ class MissingTab(Gtk.Box):
         self._cancel_btn.connect("clicked", self._on_cancel)
         toolbar.pack_start(self._cancel_btn, False, False, 0)
 
+        export_btn = Gtk.Button(label="Export CSV")
+        export_btn.connect("clicked", self._on_export_csv)
+        toolbar.pack_start(export_btn, False, False, 0)
+
         # Field selection checkboxes — all active by default
         self._chk_birth_date  = Gtk.CheckButton(label="Birth Date")
         self._chk_death_date  = Gtk.CheckButton(label="Death Date")
@@ -148,6 +152,9 @@ class MissingTab(Gtk.Box):
         if self._worker:
             self._worker.cancel()
         self._cancel_btn.set_sensitive(False)
+
+    def _on_export_csv(self, btn):
+        self._result_list.export_csv(parent_window=self.get_toplevel())
 
     def _check_done(self):
         if self._worker is not None and self._worker.is_running():

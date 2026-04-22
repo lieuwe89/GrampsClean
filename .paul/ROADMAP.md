@@ -7,8 +7,8 @@ GrampsClean ships as a single GRAMPS plugin with four integrated data quality to
 ## Current Milestone
 
 **v1.0 MVP** (v1.0)
-Status: In progress
-Phases: 5 of 6 complete
+Status: Complete
+Phases: 6 of 6 complete
 
 ## Phases
 
@@ -19,7 +19,7 @@ Phases: 5 of 6 complete
 | 3 | Missing Data Finder | 2 | Complete | 2026-04-11 |
 | 4 | Impossibilities Checker | 3 | Complete | 2026-04-11 |
 | 5 | Name Prefix Corrector | 3 | Complete | 2026-04-11 |
-| 6 | Polish & Distribution | 2 | Not started | - |
+| 6 | Polish & Distribution | 2 | Complete | 2026-04-11 |
 
 ## Phase Details
 

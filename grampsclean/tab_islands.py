@@ -4,6 +4,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib
 
+import prefs
 from widgets import ResultList
 from worker import ScanWorker
 from graph import KinshipGraph
@@ -31,7 +32,7 @@ class IslandTab(Gtk.Box):
 
         self.db_wrap = db_wrap
         self._uistate = uistate
-        self._max_size = 10
+        self._max_size = prefs.get_max_island_size()
         self._snapshot = None  # pre-fetched data, set on main thread before scan
 
         self._build_toolbar()
@@ -57,9 +58,13 @@ class IslandTab(Gtk.Box):
         self._cancel_btn.connect("clicked", self._on_cancel)
         toolbar.pack_start(self._cancel_btn, False, False, 0)
 
+        export_btn = Gtk.Button(label="Export CSV")
+        export_btn.connect("clicked", self._on_export_csv)
+        toolbar.pack_start(export_btn, False, False, 0)
+
         spin_label = Gtk.Label(label="Max group size:")
-        self._spin = Gtk.SpinButton.new_with_range(1, 50, 1)
-        self._spin.set_value(10)
+        self._spin = Gtk.SpinButton.new_with_range(1, 500, 1)
+        self._spin.set_value(prefs.get_max_island_size())
         self._spin.connect("value-changed", self._on_max_size_changed)
 
         toolbar.pack_end(self._spin, False, False, 0)
@@ -128,6 +133,9 @@ class IslandTab(Gtk.Box):
         if self._worker:
             self._worker.cancel()
         self._cancel_btn.set_sensitive(False)
+
+    def _on_export_csv(self, btn):
+        self._result_list.export_csv(parent_window=self.get_toplevel())
 
     def _on_max_size_changed(self, spin):
         self._max_size = int(spin.get_value())

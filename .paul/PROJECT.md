@@ -14,7 +14,7 @@ Genealogists with large kinship databases can find and fix data quality problems
 |-----------|-------|
 | Type | Application (GRAMPS Plugin) |
 | Version | 0.4.0 |
-| Status | In Development |
+| Status | v1.0 MVP Complete |
 | Last Updated | 2026-04-11 |
 
 ## Requirements
@@ -33,14 +33,16 @@ Genealogists with large kinship databases can find and fix data quality problems
 - ✓ Missing data finder (configurable fields, living/deceased filter, per-field counts, navigation) — Phase 3
 - ✓ Genealogical impossibilities checker (15 rules, configurable thresholds, grouped results with severity colour-coding, navigation) — Phase 4
 - ✓ Name prefix corrector (detect → preview with checkboxes → bulk apply via DbTxn with undo) — Phase 5
+- ✓ Preferences dialog (default thresholds, max island size, prefix list) + CSV export on all four tabs — Phase 6
+- ✓ Plugin packaged as GRAMPS addon zip with README and complete .gpr.py distribution metadata — Phase 6
 
 ### Active (In Progress)
 
-*(Phase 6 — Polish & Distribution)*
+*(none — v1.0 MVP complete)*
 
 ### Planned (Next)
 
-- [ ] Polish and distribution
+*(none — all v1.0 phases shipped)*
 
 ### Out of Scope
 
@@ -94,6 +96,8 @@ GRAMPS is an open-source genealogy application written in Python using GTK3. Plu
 | DEFAULT_PREFIXES sorted longest-first | Prevents "van" matching before "van der" — would produce wrong prefix strip | 2026-04-11 | Active — must maintain if user edits list |
 | DbTxn import: from gramps.gen.db import DbTxn | gramps.db does not exist; all GRAMPS write plugins use gramps.gen.db | 2026-04-11 | Active — apply to all future write operations |
 | Plugin sync required after every file edit | GRAMPS loads from ~/Library/Application Support/gramps/gramps60/plugins/ — source edits must be cp -r to that folder | 2026-04-11 | Active — documented in CLAUDE.md |
+| README placed inside grampsclean/ | Travels with the plugin in the distribution zip; users see it after unpacking | 2026-04-11 | Distribution |
+| package.sh reads version from gpr.py dynamically | Single source of truth for version; re-run script after version bump | 2026-04-11 | Distribution |
 
 ## Success Metrics
 
@@ -144,4 +148,4 @@ The checker will flag the following (configurable thresholds where noted):
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-04-11 after Phase 5*
+*Last updated: 2026-04-11 after Phase 6 — v1.0 MVP complete*

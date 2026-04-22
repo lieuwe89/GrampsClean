@@ -18,6 +18,7 @@ from gramps.gui.managedwindow import ManagedWindow
 
 from db import GrampsDb
 from worker import ScanWorker  # noqa: F401 — imported here for future tab use
+import prefs  # registers all grampsclean.* config keys at import time
 from tab_islands import IslandTab
 from tab_missing import MissingTab
 from tab_impossibilities import ImpossibilitiesTab
@@ -88,6 +89,10 @@ class GrampsCleanTool(tool.Tool, ManagedWindow):
         button_bar = Gtk.Box(spacing=6)
         button_bar.set_border_width(8)
 
+        prefs_btn = Gtk.Button(label="Preferences\u2026")
+        prefs_btn.connect("clicked", self._on_preferences)
+        button_bar.pack_start(prefs_btn, False, False, 0)
+
         close_btn = Gtk.Button(label="Close")
         close_btn.connect("clicked", self.close)
         button_bar.pack_end(close_btn, False, False, 0)
@@ -106,6 +111,12 @@ class GrampsCleanTool(tool.Tool, ManagedWindow):
     def build_menu_names(self, obj):
         """Return menu label pair required by ManagedWindow."""
         return ("GrampsClean", "GrampsClean")
+
+    def _on_preferences(self, btn):
+        """Open the preferences dialog. Tabs read fresh config on their next Scan."""
+        dlg = prefs.PreferencesDialog(parent=self.window)
+        dlg.run()
+        dlg.destroy()
 
     def close(self, *args):
         """Close the window and deregister from ManagedWindow."""

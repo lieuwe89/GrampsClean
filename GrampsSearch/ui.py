@@ -435,9 +435,14 @@ class SearchBox(Gtk.Box):
 
         if cand.detail_url:
             src = Gtk.Label(xalign=0)
-            src.set_markup(f"<i>{_('Source')}:</i> {cand.detail_url}")
+            esc = GLib.markup_escape_text(cand.detail_url)
+            src.set_markup(
+                f"<i>{_('Source')}:</i> <a href=\"{esc}\">{esc}</a>"
+            )
             src.set_selectable(True)
             src.set_line_wrap(True)
+            src.set_track_visited_links(True)
+            src.set_tooltip_text(_("Open in browser"))
             self.detail_grid.attach(src, 0, len(rows) + 2, 4, 1)
 
         self.detail_grid.show_all()

@@ -7,6 +7,11 @@ against obsidian note `Groninger Archieven API.md`.
 from typing import List, Optional
 from .base import BaseConnector, ExternalPerson
 
+try:
+    from names import parse_name, strip_tussenvoegsel
+except ImportError:
+    from ..names import parse_name, strip_tussenvoegsel
+
 
 BIRTH_DEEDS = ("geboorte", "doop", "birth", "baptism")
 DEATH_DEEDS = ("overlijden", "begraven", "death", "burial")
@@ -44,9 +49,16 @@ class AlleGroningersClient(BaseConnector):
         # Prefer explicit fields when present; fall back to display name.
         given = (meta.get("voornaam") or "").strip()
         surname = (meta.get("geslachtsnaam") or meta.get("achternaam") or "").strip()
+        if surname:
+            # Memorix sometimes bakes the tussenvoegsel into the surname
+            # field ("van der Berg") — normalise to core surname so the
+            # matcher scores against an equivalent local surname.
+            _, surname = strip_tussenvoegsel(surname)
         if not given and not surname:
             display = (meta.get("person_display_name") or "").strip()
-            given, surname = self._split_name(display)
+            parts = parse_name(display)
+            given = parts.given
+            surname = parts.surname
 
         event_date = meta.get("datum")
         event_place = meta.get("plaats", "") or ""
@@ -70,12 +82,3 @@ class AlleGroningersClient(BaseConnector):
             detail_url=self.detail_url_tmpl.format(uuid=uuid) if uuid else "",
             raw=rec,
         )
-
-    @staticmethod
-    def _split_name(full):
-        if not full:
-            return "", ""
-        parts = full.rsplit(" ", 1)
-        if len(parts) == 2:
-            return parts[0], parts[1]
-        return "", parts[0]

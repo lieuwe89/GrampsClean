@@ -39,6 +39,15 @@ user approve + merge into the local database.
   top 3 scored (with weight breakdown).
 - GenealogieOnline OAuth2 stub exists but is **disabled** (no creds
   wired up). See "Next steps" below.
+- **Dutch name parser** (NEW): `names.py` + `tests/test_names.py`
+  (28 stdlib unit tests, all green). Connectors normalise candidate
+  given/surname via `parse_name`; matcher surname compare strips
+  leading tussens on both sides (`van der Berg` ↔ `Berg` → 1.0).
+  See Next steps #6 below.
+- **Clickable source URL** (NEW): the per-candidate detail grid
+  renders `cand.detail_url` as a `Gtk.Label` with `<a href>` markup;
+  clicking opens the archive detail page in the default browser via
+  Gtk's default `activate-link` handler. Tooltip: "Open in browser".
 
 ## Layout
 
@@ -218,10 +227,48 @@ accepts. Then wire year_from/year_to through.
 
 Stdlib-only, no GRAMPS needed.
 
-### 6. Better name splitter
+### 6. Better name splitter — SHIPPED
 
-Dedicated parser handling patronymics, parens, Dutch
-`tussenvoegsel` (`van`, `de`, `de la`, `Alberda van`).
+`names.py` adds `parse_name(full) -> NameParts(given, tussenvoegsel,
+surname, patronymic)` and `strip_tussenvoegsel(surname)` (leading-
+particle split for surname-only strings). Pure stdlib.
+
+Handles:
+- Dutch tussenvoegsels (`van`, `de`, `der`, `den`, `ten`, `ter`,
+  `'t`, `op`, `in`, `aan`, `bij`, `onder`, `uit`, `la`, `le`, `du`,
+  `des`, ...). Compound runs (`van der`, `in 't`) fall out per-token.
+- Comma-reordered archive form: `Bloemersma, Jan van` and
+  `Alberda van Bloemersma, Jan` (compound surname preserved because
+  comma form is authoritative — left side is the surname unit).
+- Parenthesised aliases: `Jan (Johannes) de Vries`.
+- Trailing patronymics: `Jansz`, `Jansz.`, `Janszoon`, `Jansdr`, `Jansd`.
+- Solo `Given Patronymic` (pre-1811): surname="", given=first token,
+  patronymic set.
+
+Known limitation: plain (non-comma) input is ambiguous for compound
+surnames — `Jan Alberda van Bloemersma` resolves to
+given='Jan Alberda', tussen='van', surname='Bloemersma'. Without a
+given-name dictionary we can't reliably tell 'Cornelis' (given) from
+'Alberda' (surname prefix). Archives that matter (Open Archieven,
+AlleGroningers) give us comma form or explicit voornaam/achternaam
+fields, so the plain-form case is rare in practice.
+
+Wired into:
+- `api/open_archieven.py::_normalize` — replaces the naïve
+  `rsplit(" ", 1)` with `parse_name`.
+- `api/alle_groningers.py::_normalize` — `strip_tussenvoegsel` on
+  `geslachtsnaam` (sometimes comes baked with 'van der'), plus
+  `parse_name` on the `person_display_name` fallback.
+- `matcher.py::_sim_surname` — new helper, strips leading tussens
+  from both sides before comparing, so 'van der Berg' vs 'Berg'
+  scores 1.0. `score_candidate` uses it for surname similarity.
+
+Tests: 28 cases in `tests/test_names.py` (stdlib `unittest`, no
+GRAMPS). Run from the `GrampsSearch/` dir:
+
+```bash
+python3 -m unittest tests.test_names -v
+```
 
 ## Useful commands
 

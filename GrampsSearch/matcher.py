@@ -9,6 +9,11 @@ from difflib import SequenceMatcher
 from dataclasses import dataclass
 from typing import Optional
 
+try:
+    from names import strip_tussenvoegsel
+except ImportError:
+    from .names import strip_tussenvoegsel
+
 
 YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
 
@@ -22,6 +27,15 @@ def _sim(a: str, b: str) -> float:
     if not a or not b:
         return 0.0
     return SequenceMatcher(None, a, b).ratio()
+
+
+def _sim_surname(a: str, b: str) -> float:
+    """Surname similarity that ignores leading Dutch tussenvoegsels
+    on either side. 'van der Berg' and 'Berg' compare as equal cores.
+    """
+    _, core_a = strip_tussenvoegsel(a or "")
+    _, core_b = strip_tussenvoegsel(b or "")
+    return _sim(core_a, core_b)
 
 
 def extract_year(date_text: Optional[str]) -> Optional[int]:
@@ -64,7 +78,7 @@ def score_candidate(local: dict, candidate) -> MatchScore:
     matters).
     """
     name_score = 0.5 * _sim(local.get("given", ""), candidate.given) \
-        + 0.5 * _sim(local.get("surname", ""), candidate.surname)
+        + 0.5 * _sim_surname(local.get("surname", ""), candidate.surname)
 
     local_birth_year = (local.get("birth") or {}).get("date")
     local_birth_year = local_birth_year[0] if local_birth_year else None

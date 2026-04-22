@@ -9,6 +9,11 @@ can still score on name.
 from typing import List, Optional
 from .base import BaseConnector, ExternalPerson
 
+try:
+    from names import parse_name  # top-level when GRAMPS loads tool.py
+except ImportError:
+    from ..names import parse_name  # package-relative when run as a package
+
 
 BIRTH_EVENTS = ("geboorte", "doop", "birth", "baptism")
 DEATH_EVENTS = ("overlijden", "begraven", "death", "burial")
@@ -39,7 +44,9 @@ class OpenArchievenClient(BaseConnector):
 
     def _normalize(self, rec: dict) -> ExternalPerson:
         name = (rec.get("personname") or "").strip()
-        given, surname = self._split_name(name)
+        parts = parse_name(name)
+        given = parts.given
+        surname = parts.surname
 
         date = self._fmt_date(rec.get("eventdate"))
         places = rec.get("eventplace") or []
@@ -78,12 +85,3 @@ class OpenArchievenClient(BaseConnector):
         if m:
             return f"{y:04d}-{m:02d}"
         return f"{y:04d}"
-
-    @staticmethod
-    def _split_name(full):
-        if not full:
-            return "", ""
-        parts = full.rsplit(" ", 1)
-        if len(parts) == 2:
-            return parts[0], parts[1]
-        return "", parts[0]

@@ -31,6 +31,7 @@ from api import (  # noqa: F401
     GenealogieOnlineClient,
     CachedConnector,
 )
+import prefs  # registers config keys at import time
 
 _ = glocale.translation.gettext
 
@@ -59,12 +60,39 @@ class GrampsSearchTool(tool.Tool, ManagedWindow):
     # ------------------------------------------------------------------
 
     def _build_connectors(self):
-        raw = [
-            OpenArchievenClient(),
-            AlleGroningersClient(),
-        ]
-        # GenealogieOnline needs OAuth2 creds — wire via prefs later.
-        return [CachedConnector(c) for c in raw]
+        enabled = prefs.get_enabled_sources()
+        raw = []
+        if prefs.SOURCE_OPENARCH in enabled:
+            raw.append(OpenArchievenClient())
+        if prefs.SOURCE_ALLEGRONINGERS in enabled:
+            raw.append(AlleGroningersClient())
+        if prefs.SOURCE_GENEALOGIEONLINE in enabled:
+            go = self._build_genealogieonline()
+            if go is not None:
+                raw.append(go)
+
+        if not prefs.get_cache_enabled():
+            return raw
+        ttl = prefs.get_cache_ttl_seconds()
+        return [CachedConnector(c, ttl_seconds=ttl) for c in raw]
+
+    def _build_genealogieonline(self):
+        creds = prefs.get_genealogieonline_creds()
+        if not (creds["client_id"] and creds["client_secret"] and creds["redirect_uri"]):
+            print("[GrampsSearch] GenealogieOnline enabled but creds missing — skipping")
+            return None
+        client = GenealogieOnlineClient(
+            client_id=creds["client_id"],
+            client_secret=creds["client_secret"],
+            redirect_uri=creds["redirect_uri"],
+        )
+        if prefs.has_valid_genealogieonline_token():
+            token, exp = prefs.get_genealogieonline_token()
+            client.set_token(token, expires_at=exp)
+        else:
+            print("[GrampsSearch] GenealogieOnline: no valid token — connector will skip calls")
+            return None
+        return client
 
     def _build_window(self):
         window = Gtk.Window()

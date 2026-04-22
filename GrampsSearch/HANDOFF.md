@@ -50,6 +50,7 @@ GrampsSearch/
 ├── db.py                 GrampsDb — read helpers + merge_fields() txn writer
 ├── matcher.py            filter_and_rank() — difflib + year proximity
 ├── ui.py                 SearchBox (Gtk.Box) — TreeStore + per-field grid + Merge btn
+├── prefs.py              GRAMPS config keys + PreferencesDialog
 └── api/
     ├── __init__.py       Re-exports all connectors
     ├── base.py           BaseConnector, ExternalPerson, ConnectorError, _SSL_CTX
@@ -152,7 +153,8 @@ Remaining follow-ups:
 - Live-verified inside GRAMPS (two consecutive window opens — DONE).
 - "Clear API cache" button in `ui.SearchBox` button row — DONE
   (wraps `api.cache.clear_cache`, updates status text).
-- Expose TTL + cache-enabled toggle via future `prefs.py`.
+- TTL + cache-enabled toggle exposed via `prefs.py` — DONE
+  (see #3 below).
 
 ### 2. Widen year window — SHIPPED
 
@@ -171,11 +173,40 @@ Remaining follow-ups:
 - Cache key extended to include both bounds; old single-`year` keys
   would just miss once and repopulate.
 
-### 3. `prefs.py`
+### 3. `prefs.py` — SHIPPED
 
-Gramps config keys for OAuth creds + token, modelled on
-`grampsclean/prefs.py`. Also good home for cache TTL, debug-log
-toggle, and source-selection checkboxes.
+GRAMPS config keys registered on import; `PreferencesDialog` opened
+from a new "Settings…" button in `ui.SearchBox`.
+
+Keys (namespace `grampssearch.`):
+- `cache_enabled` (bool), `cache_ttl_days` (int, 1-365)
+- `debug_log_enabled` (bool)
+- `use_openarchieven`, `use_allegroningers`, `use_genealogieonline`
+- `genealogieonline_client_id` / `_client_secret` / `_redirect_uri`
+- `genealogieonline_token` / `_token_expires_at` (persisted but
+  still no in-app OAuth flow — token must be provisioned manually
+  or wired up later)
+
+Helpers: `get_cache_enabled`, `get_cache_ttl_seconds`,
+`get_debug_log_enabled`, `get_enabled_sources`,
+`get_genealogieonline_creds`, `get_genealogieonline_token`,
+`set_genealogieonline_token`, `has_valid_genealogieonline_token`.
+
+Wiring:
+- `tool._build_connectors` filters by `get_enabled_sources()`, wraps
+  with `CachedConnector(ttl_seconds=get_cache_ttl_seconds())` only if
+  `get_cache_enabled()`. GenealogieOnline is skipped unless creds
+  complete AND a valid token is stored.
+- `ui._log` + `_start_scan`'s truncate both gate on
+  `get_debug_log_enabled()`.
+
+Changes apply on next scan / next window open. Settings dialog save
+does not reload connectors live — user must close + reopen the
+window after flipping sources on/off.
+
+Remaining: actual OAuth authorize flow (browser open → paste code
+back → token exchange → `set_genealogieonline_token`). Currently
+stubbed as a hint in the dialog.
 
 ### 4. Wire AlleGroningers year filter
 
@@ -226,6 +257,6 @@ curl -s "https://api.openarch.nl/1.0/records/search.json?name=Janssen&number=3&l
   — GRAMPS scans any file matching `*.gpr.py` in plugin dirs.
 - After any file edit under `GrampsSearch/`, sync + restart GRAMPS
   to test.
-- **Next session: pick from Next steps #1 follow-ups (Clear-cache
-  button), #3 `prefs.py`, #4 AlleGroningers year filter, #5 matcher
-  tests, or #6 name splitter.**
+- **Next session: pick from Next steps #3 OAuth authorize flow,
+  #4 AlleGroningers year filter, #5 matcher tests, or #6 name
+  splitter.**

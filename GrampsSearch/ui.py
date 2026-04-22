@@ -19,6 +19,7 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 
 from matcher import score_candidate
 from api.cache import clear_cache
+import prefs
 
 _ = glocale.translation.gettext
 
@@ -27,6 +28,8 @@ DEBUG_LOG = os.path.expanduser("~/Documents/grampssearch-debug.log")
 
 
 def _log(msg):
+    if not prefs.get_debug_log_enabled():
+        return
     try:
         with open(DEBUG_LOG, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now().strftime('%H:%M:%S')} {msg}\n")
@@ -156,6 +159,12 @@ class SearchBox(Gtk.Box):
         btns.set_margin_start(8)
         btns.set_margin_end(8)
         btns.set_margin_bottom(8)
+        self.settings_btn = Gtk.Button(label=_("Settings…"))
+        self.settings_btn.set_tooltip_text(
+            _("Cache, logging, enabled sources, and GenealogieOnline credentials.")
+        )
+        self.settings_btn.connect("clicked", self._on_settings)
+        btns.pack_start(self.settings_btn, False, False, 0)
         self.clear_cache_btn = Gtk.Button(label=_("Clear API cache"))
         self.clear_cache_btn.set_tooltip_text(
             _("Delete the on-disk response cache. Next scan will re-fetch.")
@@ -181,14 +190,15 @@ class SearchBox(Gtk.Box):
             self.cancel_btn.set_sensitive(False)
             return
         self.status.set_text(_("Starting scan of %d people…") % total)
-        try:
-            with open(DEBUG_LOG, "w", encoding="utf-8") as f:
-                f.write(f"=== GrampsSearch scan start {datetime.now().isoformat()} ===\n")
-                f.write(f"connectors: {[c.source_name for c in self.connectors]}\n")
-                f.write(f"people queued: {total}\n\n")
-        except Exception as e:
-            print(f"[GrampsSearch] could not init debug log: {e}")
-        _log(f"DEBUG_LOG path: {DEBUG_LOG}")
+        if prefs.get_debug_log_enabled():
+            try:
+                with open(DEBUG_LOG, "w", encoding="utf-8") as f:
+                    f.write(f"=== GrampsSearch scan start {datetime.now().isoformat()} ===\n")
+                    f.write(f"connectors: {[c.source_name for c in self.connectors]}\n")
+                    f.write(f"people queued: {total}\n\n")
+            except Exception as e:
+                print(f"[GrampsSearch] could not init debug log: {e}")
+            _log(f"DEBUG_LOG path: {DEBUG_LOG}")
         self._scan_thread = threading.Thread(
             target=self._scan_worker, args=(total,), daemon=True
         )
@@ -317,6 +327,17 @@ class SearchBox(Gtk.Box):
         clear_cache()
         self.status.set_text(
             _("API cache cleared — next scan will re-fetch from the archives.")
+        )
+
+    def _on_settings(self, *_args):
+        parent = self.get_toplevel()
+        dlg = prefs.PreferencesDialog(parent=parent if isinstance(parent, Gtk.Window) else None)
+        try:
+            dlg.run()
+        finally:
+            dlg.destroy()
+        self.status.set_text(
+            _("Settings saved — source/TTL changes take effect on next scan.")
         )
 
     # ------------------------------------------------------------------

@@ -71,7 +71,13 @@ class BaseConnector:
     source_name = "base"
     timeout = 15
 
-    def search(self, given: str, surname: str, year: Optional[int] = None) -> List[ExternalPerson]:
+    def search(
+        self,
+        given: str,
+        surname: str,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+    ) -> List[ExternalPerson]:
         raise NotImplementedError
 
     # ------------------------------------------------------------------

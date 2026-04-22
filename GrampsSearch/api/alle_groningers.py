@@ -18,7 +18,16 @@ class AlleGroningersClient(BaseConnector):
     api_key = "6976bb7e-0c61-4f03-bf5b-df645d5fd086"
     detail_url_tmpl = "https://www.allegroningers.nl/zoeken-op-naam/persons/{uuid}"
 
-    def search(self, given: str, surname: str, year: Optional[int] = None) -> List[ExternalPerson]:
+    def search(
+        self,
+        given: str,
+        surname: str,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+    ) -> List[ExternalPerson]:
+        # TODO: wire year bounds into Memorix Solr `fq` filter
+        # (e.g. fq=datum:[YYYY-01-01 TO YYYY-12-31]). Skipped until
+        # we verify the field name + type against live responses.
         q = f"{given} {surname}".strip()
         params = {
             "apiKey": self.api_key,

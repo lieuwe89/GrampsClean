@@ -78,11 +78,14 @@ GrampsSearch/
   Each response doc is one person×event; connector dispatches
   `eventtype` (Dutch: `geboorte`/`overlijden` etc.) to birth/death
   fields.
-- **Year-narrowed search**: scan worker derives `year_hint` via
-  `ui._year_hint(local)` (birth year, else death year, else None)
-  and passes to every connector's `search(given, surname, year=)`.
-  Open Archieven forwards as `eventYear` (exact match).
-  AlleGroningers accepts the arg but doesn't use it yet.
+- **Year-windowed search**: scan worker derives `(year_from, year_to)`
+  via `ui._year_window(local)` — plausible lifespan around the known
+  date (birth → [y-10, y+100]; death-only → [y-105, y+10]; neither
+  → `(None, None)`). Passes both into every connector's
+  `search(given, surname, year_from=, year_to=)`. Open Archieven
+  forwards as `eventYearFrom` / `eventYearTo` (range, not exact).
+  AlleGroningers accepts but ignores pending Solr `fq` wiring;
+  GenealogieOnline maps to `birth_year_from` / `birth_year_to`.
 - **Matching weights** (`matcher.py`):
   `0.5·name + 0.2·birth_year + 0.2·death_year + 0.1·place`,
   threshold `0.55`. Year proximity: full score within ±3yr, linear
@@ -104,26 +107,20 @@ GrampsSearch/
 
 ## Known issues / limitations
 
-1. **No caching of API responses.** ~429 people × 2 connectors
-   per scan = hundreds of HTTP calls every time the window opens.
-   Re-scans repeat the same surname queries. **Next step #1.**
-2. **Name parsing is rough** on Open Archieven: `personname` has
+1. **Name parsing is rough** on Open Archieven: `personname` has
    alias parens sometimes, `rsplit(" ", 1)` produces artifacts.
    AlleGroningers `voornaam` sometimes contains patronymic. Local
    `Alberda van Bloemersma` → split surname/tussenvoegsel not
    handled; matcher compares as one string.
-3. **GenealogieOnline disabled.** OAuth2 flow is coded (authorize
+2. **GenealogieOnline disabled.** OAuth2 flow is coded (authorize
    URL, code exchange, bearer header) but needs `client_id` /
    `client_secret` / `redirect_uri` + token persistence. Needs a
    `prefs.py` config dialog wired into `tool._build_connectors`.
-4. **Year-hint is exact-match only.** We pass a single year to
-   OpenArchieven's `eventYear`. If local has a birth year but
-   we're also looking for the death record, the death event may
-   fall outside that exact year and get filtered server-side.
-   Switch to `eventYearFrom`/`eventYearTo` if recall is too low.
-5. **AlleGroningers doesn't use year.** Memorix `q`-only for now;
-   the `year=` kwarg is accepted but ignored.
-6. **Debug log is always on.** Truncates `~/Documents/grampssearch-debug.log`
+3. **AlleGroningers doesn't use year.** Memorix `q`-only for now;
+   the `year_from`/`year_to` kwargs are accepted but ignored. Needs
+   a live probe to confirm the Solr `fq=datum:[… TO …]` field name
+   + format before wiring.
+4. **Debug log is always on.** Truncates `~/Documents/grampssearch-debug.log`
    at each scan; fine for now, gate behind a flag if noisy later.
 
 ## Next steps
@@ -134,8 +131,8 @@ Implemented in `api/cache.py` exactly to the design below. Live-test
 inside GRAMPS still pending (open window twice, confirm `[cache] HIT`
 for every person on the second open).
 
-- Key: `source|given_norm|surname_norm|year` (normalize via
-  `.strip().lower()`; `year` may be empty).
+- Key: `source|given_norm|surname_norm|year_from|year_to` (normalize
+  names via `.strip().lower()`; year bounds may be empty).
 - Value: JSON-encoded list of `ExternalPerson.as_dict()` rows.
   Reconstruct with `ExternalPerson(**d)` on hit.
 - Storage: `~/Library/Application Support/gramps/gramps60/grampssearch_cache.db`,
@@ -152,28 +149,45 @@ for every person on the second open).
   a UI button — still a "nice to have".
 
 Remaining follow-ups:
-- Live-verify inside GRAMPS (two consecutive window opens).
+- Live-verified inside GRAMPS (two consecutive window opens — DONE).
 - Add "Clear cache" button to `ui.SearchBox` toolbar (wraps
   `api.cache.clear_cache`).
 - Expose TTL + cache-enabled toggle via future `prefs.py`.
 
-### 2. `prefs.py`
+### 2. Widen year window — SHIPPED
+
+- `BaseConnector.search` signature changed to
+  `search(given, surname, year_from=None, year_to=None)`.
+- `ui._year_window(local)` returns the plausible-lifespan bounds:
+  birth known → `[y-10, y+100]`, death-only → `[y-105, y+10]`,
+  neither → `(None, None)`.
+- OpenArchieven forwards as `eventYearFrom` / `eventYearTo`
+  (live-verified against api.openarch.nl — hits stay inside the
+  range).
+- GenealogieOnline maps to `birth_year_from` / `birth_year_to`
+  (still disabled — no OAuth creds).
+- AlleGroningers accepts but still ignores. Needs a live probe to
+  confirm the Memorix Solr `fq=datum:[…]` field name + type.
+- Cache key extended to include both bounds; old single-`year` keys
+  would just miss once and repopulate.
+
+### 3. `prefs.py`
 
 Gramps config keys for OAuth creds + token, modelled on
 `grampsclean/prefs.py`. Also good home for cache TTL, debug-log
 toggle, and source-selection checkboxes.
 
-### 3. Widen year window
+### 4. Wire AlleGroningers year filter
 
-Swap exact `eventYear` for `eventYearFrom=year-10`/`eventYearTo=year+90`
-in Open Archieven to cover a plausible lifespan. Wire year filter
-into AlleGroningers (Memorix supports Solr-style filters via `fq`).
+Probe Memorix live: curl with a trial `fq=datum:[1800-01-01 TO 1900-12-31]`
+(or numeric `fq=datum:[1800 TO 1900]`) and see which the endpoint
+accepts. Then wire year_from/year_to through.
 
-### 4. Unit tests for matcher
+### 5. Unit tests for matcher
 
 Stdlib-only, no GRAMPS needed.
 
-### 5. Better name splitter
+### 6. Better name splitter
 
 Dedicated parser handling patronymics, parens, Dutch
 `tussenvoegsel` (`van`, `de`, `de la`, `Alberda van`).
@@ -212,5 +226,6 @@ curl -s "https://api.openarch.nl/1.0/records/search.json?name=Janssen&number=3&l
   — GRAMPS scans any file matching `*.gpr.py` in plugin dirs.
 - After any file edit under `GrampsSearch/`, sync + restart GRAMPS
   to test.
-- **Next session task: API response caching.** See "Next steps #1"
-  above for design + acceptance criteria.
+- **Next session: pick from Next steps #1 follow-ups (Clear-cache
+  button), #3 `prefs.py`, #4 AlleGroningers year filter, #5 matcher
+  tests, or #6 name splitter.**

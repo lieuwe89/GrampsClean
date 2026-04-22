@@ -34,18 +34,23 @@ def _log(msg):
     print(msg)
 
 
-def _year_hint(local):
-    """Pick a year to narrow the API search.
+def _year_window(local):
+    """Plausible-lifespan (from, to) window to narrow the API search.
 
-    Prefer birth year; fall back to death year. `person_summary` stores
-    dates as `(year, month, day)` tuples (or None).
+    `person_summary` stores dates as `(year, month, day)` tuples (or None).
+    Birth year known  -> [birth-10, birth+100]: covers own birth + death.
+    Only death known  -> [death-105, death+10]: covers births preceding.
+    Neither           -> (None, None) — no server-side filter.
     """
-    for key in ("birth", "death"):
-        ev = local.get(key) or {}
-        ymd = ev.get("date")
-        if ymd and ymd[0]:
-            return int(ymd[0])
-    return None
+    birth = (local.get("birth") or {}).get("date")
+    if birth and birth[0]:
+        y = int(birth[0])
+        return (y - 10, y + 100)
+    death = (local.get("death") or {}).get("date")
+    if death and death[0]:
+        y = int(death[0])
+        return (y - 105, y + 10)
+    return (None, None)
 
 
 class SearchBox(Gtk.Box):
@@ -194,18 +199,23 @@ class SearchBox(Gtk.Box):
                 GLib.idle_add(self._update_progress, idx, total, None)
                 continue
 
-            year_hint = _year_hint(local)
+            year_from, year_to = _year_window(local)
             _log(
                 f"--- person {idx}/{total}: '{local.get('given','')}' "
                 f"'{local.get('surname','')}' (id={local.get('gramps_id','')}) "
-                f"year_hint={year_hint}"
+                f"year_window=[{year_from},{year_to}]"
             )
             all_candidates = []
             for c in self.connectors:
                 if self._cancel.is_set():
                     break
                 try:
-                    hits = c.search(local["given"], local["surname"], year=year_hint)
+                    hits = c.search(
+                        local["given"],
+                        local["surname"],
+                        year_from=year_from,
+                        year_to=year_to,
+                    )
                     _log(f"  {c.source_name}: {len(hits)} hits")
                     for h in hits[:3]:
                         _log(

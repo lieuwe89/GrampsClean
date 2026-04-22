@@ -18,10 +18,17 @@ class OpenArchievenClient(BaseConnector):
     source_name = "openarchieven"
     base_url = "https://api.openarch.nl/1.0/records/search.json"
 
-    def search(self, given: str, surname: str, year: Optional[int] = None) -> List[ExternalPerson]:
+    def search(
+        self,
+        given: str,
+        surname: str,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+    ) -> List[ExternalPerson]:
         params = {
             "name": f"{given} {surname}".strip(),
-            "eventYear": year,
+            "eventYearFrom": year_from,
+            "eventYearTo": year_to,
             "start": 0,
             "number": 20,
             "lang": "nl",

@@ -74,8 +74,19 @@ class GenealogieOnlineClient(BaseConnector):
 
     # ------------------------------------------------------------------
 
-    def search(self, given: str, surname: str, year: Optional[int] = None) -> List[ExternalPerson]:
-        params = {"firstname": given, "lastname": surname, "birth_year": year}
+    def search(
+        self,
+        given: str,
+        surname: str,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+    ) -> List[ExternalPerson]:
+        params = {
+            "firstname": given,
+            "lastname": surname,
+            "birth_year_from": year_from,
+            "birth_year_to": year_to,
+        }
         url = f"{self.api_base}/persons?{self._qs(params)}"
         data = self._get_json(url, headers=self._auth_headers())
         return [self._normalize(rec) for rec in data.get("results", [])]

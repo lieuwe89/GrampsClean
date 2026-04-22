@@ -4,7 +4,7 @@ Cuts redundant HTTP across re-scans and across people sharing a surname.
 Wrap any `BaseConnector` with `CachedConnector(inner)` — same `search()`
 signature, same return shape (list[ExternalPerson]).
 
-Key: `source|given_norm|surname_norm|year`.
+Key: `source|given_norm|surname_norm|year_from|year_to`.
 Value: JSON-encoded list of `ExternalPerson.as_dict()` payloads.
 TTL: 30 days default. Stale rows are ignored (and rewritten on miss).
 
@@ -68,14 +68,22 @@ def _norm(s: str) -> str:
     return (s or "").strip().lower()
 
 
-def _make_key(source: str, given: str, surname: str, year: Optional[int]) -> str:
-    return f"{source}|{_norm(given)}|{_norm(surname)}|{year if year is not None else ''}"
+def _make_key(
+    source: str,
+    given: str,
+    surname: str,
+    year_from: Optional[int],
+    year_to: Optional[int],
+) -> str:
+    yf = year_from if year_from is not None else ""
+    yt = year_to if year_to is not None else ""
+    return f"{source}|{_norm(given)}|{_norm(surname)}|{yf}|{yt}"
 
 
 class CachedConnector:
     """Decorator that adds persistent caching to any BaseConnector.
 
-    Mirrors `BaseConnector.search(given, surname, year=None)`. Exposes
+    Mirrors `BaseConnector.search(given, surname, year_from, year_to)`. Exposes
     `source_name` from the wrapped connector so callers can introspect.
     """
 
@@ -92,15 +100,21 @@ class CachedConnector:
 
     # ------------------------------------------------------------------
 
-    def search(self, given: str, surname: str, year: Optional[int] = None) -> List[ExternalPerson]:
-        key = _make_key(self.source_name, given, surname, year)
+    def search(
+        self,
+        given: str,
+        surname: str,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+    ) -> List[ExternalPerson]:
+        key = _make_key(self.source_name, given, surname, year_from, year_to)
         hit = self._read(key)
         if hit is not None:
             _log(f"[cache] HIT  {key} ({len(hit)} rows)")
             return hit
 
         _log(f"[cache] MISS {key}")
-        results = self._inner.search(given, surname, year=year)
+        results = self._inner.search(given, surname, year_from=year_from, year_to=year_to)
         try:
             self._write(key, results)
         except Exception as e:

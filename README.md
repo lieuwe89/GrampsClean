@@ -41,10 +41,9 @@ GRAMPS plugin/
 │   ├── README.md         # User guide
 │   ├── ARCHITECTURE.md   # Technical documentation
 │   └── CONTRIBUTING.md   # Development guide
-├── GrampsSearch/         # Related search utilities
 ├── README.md            # This file
-├── CLAUDE.md            # Plugin sync instructions
-└── package.sh           # Release packaging script
+├── package.sh           # Release packaging script
+└── .gitignore           # Git ignore rules
 ```
 
 ## License

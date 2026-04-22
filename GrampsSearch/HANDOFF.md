@@ -10,6 +10,21 @@ database.
 - Scaffold complete, loads in GRAMPS 6.0, window opens (smoke-test passed).
 - Live-validated: AlleGroningers + Open Archieven normalizers map
   real responses into the `ExternalPerson` dataclass correctly.
+- **Batch scan mode**: opens, auto-scans every person missing birth
+  or death (via `GrampsDb.iter_people_missing_core_events`). Threaded
+  worker + `GLib.idle_add`; progress bar + Cancel; master TreeStore
+  (person = parent, top-5 candidates = children). Merge writes fields
+  into the parent's person. Live-tested end-to-end.
+- **SSL fix**: GRAMPS's bundled macOS Python ships without trusted CA
+  roots → every `urlopen` failed with `CERTIFICATE_VERIFY_FAILED`.
+  `api/base.py::_build_ssl_context` now tries `certifi`, then common
+  CA bundle paths (`/etc/ssl/cert.pem` works on stock macOS), then
+  unverified as last resort. A single `_SSL_CTX` is passed into every
+  `urlopen`.
+- **Debug log**: `~/Documents/grampssearch-debug.log`. Truncated at
+  scan start; per person logs raw API hit counts + first 3 hits +
+  top 3 scored (with weight breakdown). Useful when matches are
+  missing.
 - GenealogieOnline OAuth2 stub exists but is **disabled** (no creds
   wired up). See "Next steps" below.
 
@@ -52,10 +67,22 @@ GrampsSearch/
   Legacy v1 is dead. Each response doc is one person×event; connector
   dispatches `eventtype` (Dutch: `geboorte`/`overlijden` etc.) to
   birth/death fields.
+- **Year-narrowed search**: scan worker derives `year_hint` via
+  `ui._year_hint(local)` (birth year, else death year, else None)
+  and passes it to every connector's `search(given, surname, year=)`.
+  Open Archieven forwards it as `eventYear` (exact match).
+  AlleGroningers' Memorix backend accepts the arg to keep the
+  signature uniform but doesn't use it yet (q-only). Tight exact
+  match may hide valid events outside the hint year — switch to a
+  `eventYearFrom`/`To` range if recall drops.
 - **Matching weights** (`matcher.py`):
   `0.5·name + 0.2·birth_year + 0.2·death_year + 0.1·place`,
   threshold `0.55`. Year proximity: full score within ±3yr, linear
   decay to 0 at ±6yr.
+  **Renormalized over present-locally fields** — we filter to people
+  *missing* events, so without renormalization their totals always
+  capped below threshold. Only fields the local person actually has
+  contribute; remaining weights redistribute.
 - **Merge** (`db.GrampsDb.merge_fields`): single `DbTxn`; creates
   or updates birth/death events, ensures Place (dedup by name),
   writes a Source + Citation with the candidate detail URL on the
@@ -63,33 +90,46 @@ GrampsSearch/
 
 ## Known issues / limitations
 
-1. **GTK blocks during API search.** Connectors run synchronously in
-   the UI thread. Threading + `GLib.idle_add` needed for smooth UX.
-2. **Whole-candidate merge only.** No per-field checkboxes; birth
+1. **Whole-candidate merge only.** No per-field checkboxes; birth
    and death are both written if the candidate has them. Users
    can't cherry-pick.
-3. **Name parsing is rough** on Open Archieven: `personname` has
+2. **Name parsing is rough** on Open Archieven: `personname` has
    alias parens sometimes, `rsplit(" ", 1)` produces artifacts.
-   AlleGroningers `voornaam` sometimes contains patronymic.
-4. **GenealogieOnline disabled.** OAuth2 flow is coded (authorize
+   AlleGroningers `voornaam` sometimes contains patronymic. Local
+   `Alberda van Bloemersma` → split surname/tussenvoegsel not
+   handled; matcher compares as one string.
+3. **GenealogieOnline disabled.** OAuth2 flow is coded (authorize
    URL, code exchange, bearer header) but needs `client_id` /
    `client_secret` / `redirect_uri` + token persistence. Needs a
    `prefs.py` config dialog wired into `tool._build_connectors`.
-5. **No year-narrowing in search.** Local birth/death years could
-   be passed as `eventYear` to Open Archieven to shrink hit sets.
+4. **Year-hint is exact-match only.** We pass a single year to
+   OpenArchieven's `eventYear`. If local has a birth year but we're
+   also looking for the death record, the death event may fall
+   outside that exact year and get filtered server-side. Switch to
+   `eventYearFrom`/`eventYearTo` if recall is too low.
+5. **AlleGroningers doesn't use year.** Memorix `q`-only for now;
+   the `year=` kwarg is accepted but ignored.
+6. **Debug log is always on.** Truncates `~/Documents/grampssearch-debug.log`
+   at each scan; fine for now, gate behind a flag if noisy later.
+7. **Whole-DB scans cost real time.** ~429 people × 2 connectors =
+   hundreds of HTTP calls per open. No caching of API responses
+   between scans.
 
 ## Next steps (pick any)
 
-1. **Thread API calls** — background fetch, dispatch results via
-   `GLib.idle_add`. Highest UX win.
-2. **Per-field merge** — checkboxes per field in the candidate pane.
-3. **`prefs.py`** — Gramps config keys for OAuth creds + token,
-   modelled on `grampsclean/prefs.py`.
-4. **Narrow searches** — pass local year to `search(given, surname, year)`
-   from `ui.SearchBox._run_search`.
-5. **Unit tests for matcher** — stdlib-only, no GRAMPS needed.
-6. **Better name splitter** — dedicated parser handling patronymics,
-   parens, Dutch `tussenvoegsel` (`van`, `de`, etc.).
+1. **Per-field merge** — checkboxes per field in the candidate pane.
+2. **`prefs.py`** — Gramps config keys for OAuth creds + token,
+   modelled on `grampsclean/prefs.py`. Also good home for debug-log
+   toggle and source-selection checkboxes.
+3. **Widen year window** — swap exact `eventYear` for
+   `eventYearFrom=year-10`/`eventYearTo=year+90` in Open Archieven
+   to cover a plausible lifespan. Wire year filter into
+   AlleGroningers (Memorix supports Solr-style filters via `fq`).
+4. **Unit tests for matcher** — stdlib-only, no GRAMPS needed.
+5. **Better name splitter** — dedicated parser handling patronymics,
+   parens, Dutch `tussenvoegsel` (`van`, `de`, `de la`, `Alberda van`).
+6. **Cache API responses** — dedupe across re-scans / across people
+   who share a surname.
 
 ## Useful commands
 
@@ -107,8 +147,9 @@ Syntax check everything:
 python3 -m py_compile GrampsSearch/*.py GrampsSearch/api/*.py
 ```
 
-Live-probe APIs via `curl` (local Python 3.13 has SSL cert issues,
-but curl works; GRAMPS's bundled Python does not have this issue):
+Live-probe APIs via `curl` (both local Python 3.13 and GRAMPS's
+bundled macOS Python hit `CERTIFICATE_VERIFY_FAILED` without help —
+see `_build_ssl_context` in `api/base.py`):
 
 ```bash
 curl -s "https://webservices.memorix.nl/genealogy/person?apiKey=6976bb7e-0c61-4f03-bf5b-df645d5fd086&q=Janssen&rows=3" | python3 -m json.tool | head -30

@@ -56,6 +56,12 @@ def score_candidate(local: dict, candidate) -> MatchScore:
     """
     local: dict from GrampsDb.person_summary
     candidate: api.base.ExternalPerson
+
+    Weights: name 0.5, birth 0.2, death 0.2, place 0.1.
+    Slots whose local field is absent are excluded and the remaining
+    weights are renormalized so totals stay comparable across people
+    with partial data (we filter to people *missing* events, so this
+    matters).
     """
     name_score = 0.5 * _sim(local.get("given", ""), candidate.given) \
         + 0.5 * _sim(local.get("surname", ""), candidate.surname)
@@ -64,18 +70,24 @@ def score_candidate(local: dict, candidate) -> MatchScore:
     local_birth_year = local_birth_year[0] if local_birth_year else None
     local_death_year = (local.get("death") or {}).get("date")
     local_death_year = local_death_year[0] if local_death_year else None
+    local_birth_place = (local.get("birth") or {}).get("place", "") or ""
+    local_death_place = (local.get("death") or {}).get("place", "") or ""
 
     birth_score = year_proximity(local_birth_year, extract_year(candidate.birth_date))
     death_score = year_proximity(local_death_year, extract_year(candidate.death_date))
-
-    local_birth_place = (local.get("birth") or {}).get("place", "")
-    local_death_place = (local.get("death") or {}).get("place", "")
     place_score = max(
         _sim(local_birth_place, candidate.birth_place),
         _sim(local_death_place, candidate.death_place),
     )
 
-    total = 0.5 * name_score + 0.2 * birth_score + 0.2 * death_score + 0.1 * place_score
+    weighted = {"name": (0.5, name_score, True)}
+    weighted["birth"] = (0.2, birth_score, local_birth_year is not None)
+    weighted["death"] = (0.2, death_score, local_death_year is not None)
+    weighted["place"] = (0.1, place_score, bool(local_birth_place or local_death_place))
+
+    total_weight = sum(w for w, _s, present in weighted.values() if present) or 1.0
+    total = sum(w * s for w, s, present in weighted.values() if present) / total_weight
+
     return MatchScore(total=total, name=name_score, birth=birth_score, death=death_score, place=place_score)
 
 

@@ -3,11 +3,25 @@
 import os
 import sys
 
-# GRAMPS loads tool.py as a top-level module (not inside a package), so we
-# add the grampsclean/ directory to sys.path to allow sibling-module imports.
+# GRAMPS loads this file as a top-level module (not inside a package), so we
+# add the plugin directory to sys.path to allow sibling-module imports.
+# Force this plugin's dir to the FRONT so its modules win over other plugins'.
 _here = os.path.dirname(os.path.abspath(__file__))
-if _here not in sys.path:
-    sys.path.insert(0, _here)
+if _here in sys.path:
+    sys.path.remove(_here)
+sys.path.insert(0, _here)
+
+# Evict sibling-module names cached from a DIFFERENT plugin directory.
+# GRAMPS plugins live in a flat layout, so common names like ``prefs``,
+# ``db``, ``worker`` collide across plugins via ``sys.modules``. Without
+# this purge, opening one plugin then another reuses the first plugin's
+# stale modules and raises AttributeError on plugin-specific symbols.
+_here_prefix = _here + os.sep
+for _name in list(sys.modules):
+    _mod = sys.modules.get(_name)
+    _f = getattr(_mod, "__file__", None) or ""
+    if _f and os.sep + "plugins" + os.sep in _f and not _f.startswith(_here_prefix):
+        del sys.modules[_name]
 
 import gi
 gi.require_version("Gtk", "3.0")

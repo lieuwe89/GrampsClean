@@ -10,7 +10,7 @@ register(
     id="grampsclean",
     name=_("GrampsClean"),
     description=_("Data quality audit tools for kinship databases"),
-    version="1.0.1",
+    version="1.0.2",
     gramps_target_version=MODULE_VERSION,
     status=STABLE,
     fname="grampsclean_tool.py",

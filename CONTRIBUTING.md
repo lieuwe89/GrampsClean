@@ -27,6 +27,12 @@
 
 ### Testing
 
+#### Automated Testing
+Run the test suite using `pytest`:
+```bash
+PYTHONPATH=. pytest
+```
+
 #### Manual Testing
 1. Open GRAMPS with a test database (preferably with known data quality issues)
 2. Open **Tools → Utilities → GrampsClean**
